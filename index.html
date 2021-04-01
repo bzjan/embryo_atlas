@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta http-equiv="Content-Type" content="text/html; charset=UTF-8">
+<link rel="icon" type="image/png" href="html_files/icon.png" sizes="32x32">
+<link rel="stylesheet" type="text/css" href="html_files/style.css">
+<script src="https://ajax.googleapis.com/ajax/libs/jquery/3.2.1/jquery.min.js"></script>
+<script src="https://polyfill.io/v3/polyfill.min.js?features=es6"></script>
+<script id="MathJax-script" async src="https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js"></script>
+
+<!-- Written by Jan F. Totz (c) 2021 -->
+<!-- Please send any questions, comments or bug reports to the author at jantotz (a) mit.edu -->
+
+
+
+<script>
+	
+	<!-- load tabs.html file dynamically -->
+	$(function(){
+		$("#tabs").load("html_files/tabs.html"); 
+	});
+	
+	
+	const [nx,ny] = [618,530];										// lengths in x,y direction in pixels of clickable frame
+	const [nboxes_x,nboxes_y] = [7,6];								// number of boxes
+	const [boxSize_x,boxSize_y] = [nx/nboxes_x,ny/nboxes_y];		// lengths of a single box
+	const [x0,y0] = [80,11];										// grid offset in image (left, top corner)
+	const [bStart,bEnd] = [0.5,30.5];
+	const [cStart,cEnd] = [10.0,60.0];
+	
+	// initialize clickable image canvases
+	$(function(){
+		
+		var canvas=document.getElementById("layer_image");
+		var ctx=canvas.getContext("2d");
+		var canvas2=document.getElementById("layer_overlay");
+		var ctx2=canvas2.getContext("2d");
+		
+		const [boxIdx_x,boxIdx_y] = [0,0];								// box index
+		const [boxCorner_x,boxCorner_y] = [x0+boxIdx_x*boxSize_x,y0+boxIdx_y*boxSize_y];
+		
+		[b,c] = [bStart+boxIdx_x*(bEnd-bStart)/nboxes_x,cEnd-boxIdx_y*(cEnd-cStart)/nboxes_y];
+		
+		var imgOverview = new Image();
+		imgOverview.onload = function () {
+			// draw background file on canvas
+			ctx.drawImage(imgOverview,0,0,canvas.width,canvas.height);
+			
+			// draw overlay
+			ctx2.strokeStyle = "red";
+			ctx2.strokeRect(boxCorner_x,boxCorner_y,boxSize_x,boxSize_y);
+			ctx2.strokeStyle = "orange";
+			ctx2.strokeRect(boxCorner_x+1,boxCorner_y+1,boxSize_x-2,boxSize_y-2);
+			ctx2.strokeRect(boxCorner_x-1,boxCorner_y-1,boxSize_x+2,boxSize_y+2);
+		}
+		imgOverview.src="state_transient/overview_images/myosin_atlas_overview.png";
+		
+		// video tab
+		var videoPlayer = document.getElementById("video_player");
+		videoPlayer.src = "state_transient/movies/movie_m0_" + b.toFixed(3) + "_wy_" + c.toFixed(3) + ".mp4";
+		videoPlayer.load();
+		//~ var canvas3=document.getElementById("video_canvas");
+		//~ var ctx3=canvas3.getContext("2d");
+		//~ var imgState = new Image();
+		//~ imgState.onload = function () {
+			//~ // draw background file on canvas
+			//~ ctx3.drawImage(imgState,0,0,canvas3.width,canvas3.height);
+		//~ }
+		//~ imgState.src="movies/movie_myosin_m0_1.000_wx_10.000.mp4";
+	});
+	
+	
+	
+	// main tab control (called in tabs.html)
+	function selectImage(evt, imageSource) {
+		
+		// tabs
+		var tablinks = document.getElementsByClassName("tablinks_image");
+		for (var i = 0; i < tablinks.length; i++) {
+			tablinks[i].className = tablinks[i].className.replace(" active", "");
+		}
+		evt.currentTarget.className += " active";					// set selected tab to active
+		
+		// image
+		var canvas=document.getElementById("layer_image");
+		var ctx=canvas.getContext("2d");
+		var img=new Image();
+		img.onload = function () {
+			ctx.drawImage(img,0,0,canvas.width,canvas.height);		// draw the image on the canvas
+		}
+		img.src = imageSource;
+	}
+	
+	// minor tab control (called in index.html)
+	function selectContent(evt, contentName) {
+		
+		// tabs
+		var tablinks = document.getElementsByClassName("tablinks_content");
+		for (var i = 0; i < tablinks.length; i++) {
+			tablinks[i].className = tablinks[i].className.replace(" active", "");
+		}
+		evt.currentTarget.className += " active";								// set selected tab to active
+		
+		// tab content
+		var tabcontent = document.getElementsByClassName("tabcontent_content");
+		for (var i = 0; i < tabcontent.length; i++) {
+			tabcontent[i].style.display = "none";
+		}
+		document.getElementById(contentName).style.display = "block";			// show current tab content
+		
+	}
+	
+	
+	
+	// get mouse position on canvas
+	function getCursorPosition(canvas, event) {
+		const rect = canvas.getBoundingClientRect()
+		const x = event.clientX - rect.left;
+		const y = event.clientY - rect.top;
+		return [x, y];
+	}
+	
+	
+	// update clickable overlay canvas
+	function clickableCanvasOverlay(event,canvas) {
+		
+		const [xpos,ypos] = getCursorPosition(canvas,event);			// position of mouse in image
+		const [x,y] = [xpos-x0, ypos-y0];								// position in grid
+		
+		// check that mouseclick occurred in good image domain
+		if(x >= 0 && x <= nx && y >= 0 && y <= ny){
+			const [boxIdx_x,boxIdx_y] = [Math.floor(x/boxSize_x), Math.floor(y/boxSize_y)];		// box index
+			const [boxCorner_x,boxCorner_y] = [x0+boxIdx_x*boxSize_x,y0+boxIdx_y*boxSize_y];
+			
+			// get b,c values
+			[b,c] = [bStart+boxIdx_x*(bEnd-bStart)/(nboxes_x-1),cEnd-boxIdx_y*(cEnd-cStart)/(nboxes_y-1)];
+			
+			// update overview image overlay
+			var ctx=canvas.getContext("2d");
+			ctx.clearRect(0, 0, canvas.width, canvas.height);
+			ctx.strokeStyle = "red";
+			ctx.strokeRect(boxCorner_x,boxCorner_y,boxSize_x,boxSize_y);
+			ctx.strokeStyle = "orange";
+			ctx.strokeRect(boxCorner_x+1,boxCorner_y+1,boxSize_x-2,boxSize_y-2);
+			ctx.strokeRect(boxCorner_x-1,boxCorner_y-1,boxSize_x+2,boxSize_y+2);
+			
+			// update video tab
+			var videoPlayer = document.getElementById("video_player");
+			videoPlayer.src = "state_transient/movies/movie_myosin_m0_" + b.toFixed(3) + "_wy_" + c.toFixed(3) + ".mp4";
+			videoPlayer.load();
+			//~ var ctx3=canvas3.getContext("2d");
+			//~ var ctx3=canvas3.getContext("2d");
+			//~ var img=new Image();
+			//~ img.onload = function () {
+				//~ ctx3.drawImage(img,0,0,canvas3.width,canvas3.height);		// draw the image on the canvas
+			//~ }
+			//~ img.src = "images/xt_state_c1_" + b.toFixed(5) + "_c2_" + c.toFixed(5) + ".png";
+			
+			// update parameter string
+			$('#datapoint').text("M0= " + b.toFixed(2) + ", wy = " + c.toFixed(2));
+			
+			//~ console.log("boxIdx_x: " + boxIdx_x + " boxIdx_y: " + boxIdx_y);			// DEBUG
+			//~ console.log("b: " + b + " c: " + c);										// DEBUG
+		}
+	}
+	
+	
+</script>
+
+
+
+
+
+
+<title>Embryo Atlas</title>
+</head>
+
+<body>
+	
+	<div class="header">
+		<h1>Embryo Atlas</h1>
+	</div> 
+	
+	<br>
+	
+	<p>
+		<font size="4">This webpage serves as a companion to the project:<br/></font>
+		<font size="2"> <br/></font>
+		<font size="5">
+			<strong>Combinatorial patterns of graded RhoA activation and uniform F-actin depletion promote tissue curvature</strong> (2021)<br/>
+			M. Denk-Lobnig, J. F. Totz, N. C. Heer, J. Dunkel, A. C. Martin <br/>
+		<br/>
+		</font>
+		<font size="4">
+			Click on the interactive overview image below to view a video of the folding:<br/>
+		</font>
+		<br/>
+	</p>
+	
+	
+	<br>
+	
+	
+	<div class="wrap">
+		
+		<div>
+			<!-- top level tab control -->
+			<div class="tab"> 
+				<div id="tabs"></div>						<!-- load tabs.html -->
+				<div class="bottom_border"></div>
+			</div>
+			
+			<!-- left: dynamic parameter space image -->
+			<div class="floatleft">
+				<p style="margin-bottom:0.1cm;">&nbsp;</p>
+				<div style="position: relative;">
+					<canvas id="layer_image" width="837" height="602" style="position: absolute; left: 0; top: 0; z-index: 0;"></canvas>
+					<canvas id="layer_overlay" width="837" height="602"  onclick="clickableCanvasOverlay(event,this)" style="position: absolute; left: 0; top: 0; z-index: 1;"></canvas>
+				</div>
+			</div>
+			
+			<!-- right: tabs for different data at selected parameters -->
+			<div class="floatright">
+				<!-- <p>The data below corresponds to the following parameters: <strong id="datapoint">\(M_0 = 50.00, w_y = 2.00\)</strong></p> -->
+				<div class="tab" id="openData">
+					<div class="left">
+						<button class="tablinks_content active" onclick="selectContent(event, 'Video')">Video</button>
+					</div>
+					<div class="right"></div>
+				</div>
+				
+				
+				<!-- content of Video tab -->
+				<div id="Video" class="tabcontent_content" style="display: block;">
+					<h3>Temporal evolution of 3d model and cross section along dorsal-lateral (DV) axis</h3>
+					<button onclick="playPause()" style="color: white; background-color: #303030; border: 0px">Play/Pause</button>
+<!--
+					<button id='playVid'>Play</button>
+-->
+					<br>
+					<video id="video_player" width="1000">
+						<source src="state_transient/movies/movie_myosin_m0_0.500_wy_50.000.mp4" type="video/mp4">
+					</video>
+<!--
+					<canvas id="video_canvas" width="852" height="403"></canvas>
+-->
+				</div>
+				
+			</div>
+		</div>
+	
+	
+	</div>
+	<div style="clear: both;"> </div>
+<!--
+	<div style="overflow: hidden; border: 0px solid #ccc; background-color: #f1f1f1; margin: 0; padding: 0;">
+-->
+<!--
+	<div style=" background-color: #f1f1f1; border: 1px solid #fff; ">
+		<p><font size="3">Created and maintained by Jan F. Totz. Please send any questions, comments or bug reports to the author at: jantotz (a) mit.edu</font></p>
+	</div>
+-->
+	
+	
+<script>
+	var myVideo=document.getElementById("video_player");
+	function playPause(){
+		if (myVideo.paused) 
+			myVideo.play(); 
+		else 
+			myVideo.pause(); 
+	}
+	//~ document.getElementById('playVid').onclick = function () {
+		//~ document.getElementById('video1').play();
+	//~ };
+</script>
+	
+</body>
+</html>
